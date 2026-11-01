@@ -1,5 +1,6 @@
 import json
 import sys
+import time
 from deep_translator import GoogleTranslator
 
 
@@ -11,7 +12,9 @@ def translate_json(obj, translator):
     elif isinstance(obj, str):
         if not obj.strip():
             return obj
-        return translator.translate(obj)
+        translated = translator.translate(obj)
+        time.sleep(0.3)
+        return translated
     else:
         return obj
 
