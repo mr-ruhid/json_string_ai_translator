@@ -1,6 +1,10 @@
 import json
 import sys
+import time
 from deep_translator import GoogleTranslator
+
+
+SEPARATOR = " @@SPLIT@@ "
 
 
 def collect_strings(obj, strings):
@@ -38,18 +42,30 @@ def main():
     with open(input_file, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    print(f"'{input_file}' oxundu, mətnlər toplanır...")
-
     all_strings = []
     collect_strings(data, all_strings)
-    print(f"Toplam {len(all_strings)} mətn tapıldı, toplu tərcümə başlayır...")
+    print(f"Toplam {len(all_strings)} mətn tapıldı.")
 
-    translated_strings = []
-    batch_size = 50
-    for i in range(0, len(all_strings), batch_size):
-        batch = all_strings[i:i + batch_size]
-        translated_batch = translator.translate_batch(batch)
-        translated_strings.extend(translated_batch)
+    joined = SEPARATOR.join(all_strings)
+
+    max_retries = 5
+    translated_joined = None
+    for attempt in range(max_retries):
+        try:
+            translated_joined = translator.translate(joined)
+            break
+        except Exception as e:
+            print(f"Cəhd {attempt + 1}/{max_retries} uğursuz: {e}. 15 saniyə gözlənilir...")
+            time.sleep(15)
+
+    if translated_joined is None:
+        print("❌ Tərcümə uğursuz oldu.")
+        sys.exit(1)
+
+    translated_strings = translated_joined.split(SEPARATOR)
+
+    if len(translated_strings) != len(all_strings):
+        print(f"⚠️ Xəbərdarlıq: bölmə sayı uyğun deyil ({len(translated_strings)} vs {len(all_strings)})")
 
     translated_iter = iter(translated_strings)
     translated_data = replace_strings(data, translated_iter)
