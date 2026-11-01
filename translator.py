@@ -1,20 +1,26 @@
 import json
 import sys
-import time
 from deep_translator import GoogleTranslator
 
 
-def translate_json(obj, translator):
+def collect_strings(obj, strings):
     if isinstance(obj, dict):
-        return {k: translate_json(v, translator) for k, v in obj.items()}
+        for v in obj.values():
+            collect_strings(v, strings)
     elif isinstance(obj, list):
-        return [translate_json(item, translator) for item in obj]
-    elif isinstance(obj, str):
-        if not obj.strip():
-            return obj
-        translated = translator.translate(obj)
-        time.sleep(0.3)
-        return translated
+        for item in obj:
+            collect_strings(item, strings)
+    elif isinstance(obj, str) and obj.strip():
+        strings.append(obj)
+
+
+def replace_strings(obj, translated_iter):
+    if isinstance(obj, dict):
+        return {k: replace_strings(v, translated_iter) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [replace_strings(item, translated_iter) for item in obj]
+    elif isinstance(obj, str) and obj.strip():
+        return next(translated_iter)
     else:
         return obj
 
@@ -32,9 +38,21 @@ def main():
     with open(input_file, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    print(f"'{input_file}' oxundu, tərcümə başlayır...")
+    print(f"'{input_file}' oxundu, mətnlər toplanır...")
 
-    translated_data = translate_json(data, translator)
+    all_strings = []
+    collect_strings(data, all_strings)
+    print(f"Toplam {len(all_strings)} mətn tapıldı, toplu tərcümə başlayır...")
+
+    translated_strings = []
+    batch_size = 50
+    for i in range(0, len(all_strings), batch_size):
+        batch = all_strings[i:i + batch_size]
+        translated_batch = translator.translate_batch(batch)
+        translated_strings.extend(translated_batch)
+
+    translated_iter = iter(translated_strings)
+    translated_data = replace_strings(data, translated_iter)
 
     output_file = input_file.replace(".json", f"_{target_lang}.json")
     with open(output_file, "w", encoding="utf-8") as f:
